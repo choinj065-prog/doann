@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CraftPixel - 픽셀 도안 에디터</title>
+  <style>
+    :root {
+      --bg-color: #f7f9fc;
+      --card-bg: #ffffff;
+      --primary: #6c5ce7;
+      --primary-hover: #5b4bc4;
+      --text: #2d3436;
+      --border: #dfe6e9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      background: var(--card-bg);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      color: var(--primary);
+    }
+
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 320px;
+      background: var(--card-bg);
+      border-right: 1px solid var(--border);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #8395a7;
+      margin-bottom: 0.5rem;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    input[type="file"], input[type="range"], select, button {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+    }
+
+    .tool-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+
+    .tool-btn {
+      background: #f1f2f6;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .tool-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.4rem;
+    }
+
+    .color-swatch {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .color-swatch.selected {
+      border-color: #2d3436;
+      transform: scale(1.1);
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #c8d6e5;
+      position: relative;
+      overflow: auto;
+      padding: 2rem;
+    }
+
+    #canvasWrapper {
+      position: relative;
+      background: white;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    .range-val {
+      font-weight: normal;
+      color: #576574;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>CraftPixel 도안 제작기</h1>
+    <button id="downloadBtn" style="width: auto; padding: 0.5rem 1rem;">PNG로 저장</button>
+  </header>
+
+  <div class="container">
+    <!-- 좌측 조작 파넬 -->
+    <div class="sidebar">
+      <!-- 1. 사진 업로드 -->
+      <div class="control-group">
+        <div class="section-title">1. 이미지 업로드</div>
+        <input type="file" id="imageInput" accept="image/*">
+      </div>
+
+      <!-- 2. 그리드 크기 조절 -->
+      <div class="control-group">
+        <div class="section-title">2. 도안 크기 조절 (<span id="gridSizeVal" class="range-val">30x30</span>)</div>
+        <input type="range" id="gridSizeInput" min="10" max="80" value="30" step="5">
+      </div>
+
+      <!-- 3. 도구 선택 -->
+      <div class="control-group">
+        <div class="section-title">3. 편집 도구</div>
+        <div class="tool-buttons">
+          <button class="tool-btn active" data-tool="pencil">연필</button>
+          <button class="tool-btn" data-tool="bucket">페인트 칠하기</button>
+          <button class="tool-btn" data-tool="eraser">지우개</button>
+          <button class="tool-btn" data-tool="picker">스포이트</button>
+        </div>
+      </div>
+
+      <!-- 4. 추천 및 활성 색상 -->
+      <div class="control-group">
+        <div class="section-title">4. 팔레트 색상 선택</div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <label for="currentColor">현재 색상:</label>
+          <input type="color" id="currentColor" value="#000000" style="width: 50px; height: 35px; padding: 0; cursor: pointer;">
+        </div>
+        <div class="palette-grid" id="paletteGrid">
+          <!-- 추천 색상 항목이 들어가는 위치 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 메인 캔버스 영역 -->
+    <div class="main-content">
+      <div id="canvasWrapper">
+        <canvas id="pixelCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ----------------------------------------------------
+    // 전역 상태 변수
+    // ----------------------------------------------------
+    let gridSize = 30;
+    const canvas = document.getElementById('pixelCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 픽셀 그리드 데이터 저장 (2차원 배열)
+    let gridData = Array(gridSize).fill().map(() => Array(gridSize).fill('#ffffff'));
+    let currentImage = null; // 업로드된 원본 Image 객체 저장
+    
+    let currentTool = 'pencil';
+    let currentColor = '#000000';
+    let isDrawing = false;
+    
+    const displaySize = 600; // 화면에 보일 캔버스 크기 (px)
+    canvas.width = displaySize;
+    canvas.height = displaySize;
+
+    // 초기 화면 그리드 그리기
+    drawGrid();
+
+    // ----------------------------------------------------
+    // 1. 사진 업로드 & 픽셀 도안 자동 변환
+    // ----------------------------------------------------
+    const imageInput = document.getElementById('imageInput');
+
+    imageInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드할 수 있습니다.');
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = function(event) {
+        const img = new Image();
+        
+        img.onload = function() {
+          currentImage = img; // 업로드된 이미지 보관
+          processImageToPixel(); // 픽셀 변환 함수 실행
+        };
+
+        img.onerror = function() {
+          alert('이미지를 로드하는 중 오류가 발생했습니다.');
+        };
+
+        img.src = event.target.result;
+      };
+
+      reader.readAsDataURL(file);
+    });
+
+    // 이미지를 현재 그리드 해상도에 맞춰 픽셀 데이터로 변환
+    function processImageToPixel() {
+      if (!currentImage) return;
+
+      // 오프스크린 캔버스를 이용해 축소 렌더링
+      const offCanvas = document.createElement('canvas');
+      const offCtx = offCanvas.getContext('2d');
+      
+      offCanvas.width = gridSize;
+      offCanvas.height = gridSize;
+
+      // 이미지 전체가 잘리지 않고 그리드 크기에 딱 맞춰 들어가도록 스케일링
+      offCtx.drawImage(currentImage, 0, 0, gridSize, gridSize);
+
+      const imgData = offCtx.getImageData(0, 0, gridSize, gridSize).data;
+      const colorCounts = {};
+
+      // 픽셀 데이터 채우기 및 색상 수집
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const i = (y * gridSize + x) * 4;
+          const r = imgData[i];
+          const g = imgData[i + 1];
+          const b = imgData[i + 2];
+          const a = imgData[i + 3];
+
+          const hex = a < 128 ? '#ffffff' : rgbToHex(r, g, b);
+          gridData[y][x] = hex;
+
+          if (a >= 128) {
+            colorCounts[hex] = (colorCounts[hex] || 0) + 1;
+          }
+        }
+      }
+
+      // 추천 팔레트 생성 (가장 많이 쓰인 색상 최대 10개)
+      const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
+      generatePalette(sortedColors.slice(0, 10));
+
+      drawGrid();
+    }
+
+    // ----------------------------------------------------
+    // 2. 도안 크기 조절 (잘림 없이 확대/축소 리샘플링)
+    // ----------------------------------------------------
+    const gridSizeInput = document.getElementById('gridSizeInput');
+    const gridSizeVal = document.getElementById('gridSizeVal');
+
+    gridSizeInput.addEventListener('input', function(e) {
+      const newSize = parseInt(e.target.value);
+      gridSizeVal.textContent = `${newSize}x${newSize}`;
+      
+      if (currentImage) {
+        // 업로드된 사진이 있으면 원본 사진 전체를 새 크기로 다시 픽셀화
+        gridSize = newSize;
+        gridData = Array(gridSize).fill().map(() => Array(gridSize).fill('#ffffff'));
+        processImageToPixel();
+      } else {
+        // 수동으로 작성된 픽셀 도안 데이터 리샘플링
+        resampleGridData(newSize);
+      }
+    });
+
+    function resampleGridData(newSize) {
+      const oldSize = gridSize;
+      const oldData = gridData;
+      
+      gridSize = newSize;
+      gridData = Array(gridSize).fill().map(() => Array(gridSize).fill('#ffffff'));
+
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const oldX = Math.floor((x / gridSize) * oldSize);
+          const oldY = Math.floor((y / gridSize) * oldSize);
+          gridData[y][x] = oldData[oldY][oldX];
+        }
+      }
+      drawGrid();
+    }
+
+    // ----------------------------------------------------
+    // 3. Canvas 렌더링 & 드로잉 에디터
+    // ----------------------------------------------------
+    function drawGrid() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cellSize = displaySize / gridSize;
+
+      // 픽셀 타일 칠하기
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          ctx.fillStyle = gridData[y][x];
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+      }
+
+      // 격자선 칠하기
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.5;
+
+      for (let i = 0; i <= gridSize; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, displaySize);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(displaySize, i * cellSize);
+        ctx.stroke();
+      }
+    }
+
+    // 캔버스 마우스/클릭 이벤트
+    canvas.addEventListener('mousedown', (e) => {
+      isDrawing = true;
+      handleCanvasClick(e);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDrawing && (currentTool === 'pencil' || currentTool === 'eraser')) {
+        handleCanvasClick(e);
+      }
+    });
+
+    window.addEventListener('mouseup', () => isDrawing = false);
+
+    function handleCanvasClick(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const cellSize = displaySize / gridSize;
+      const gridX = Math.floor(clickX / cellSize);
+      const gridY = Math.floor(clickY / cellSize);
+
+      if (gridX < 0 || gridX >= gridSize || gridY < 0 || gridY >= gridSize) return;
+
+      if (currentTool === 'pencil') {
+        gridData[gridY][gridX] = currentColor;
+      } else if (currentTool === 'eraser') {
+        gridData[gridY][gridX] = '#ffffff';
+      } else if (currentTool === 'picker') {
+        currentColor = gridData[gridY][gridX];
+        document.getElementById('currentColor').value = currentColor;
+      } else if (currentTool === 'bucket') {
+        floodFill(gridX, gridY, gridData[gridY][gridX], currentColor);
+      }
+
+      drawGrid();
+    }
+
+    // 플러드 필(Bucket) 알고리즘
+    function floodFill(startX, startY, targetColor, replacementColor) {
+      if (targetColor === replacementColor) return;
+      
+      const queue = [[startX, startY]];
+      while (queue.length > 0) {
+        const [x, y] = queue.pop();
+        if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) continue;
+        if (gridData[y][x] === targetColor) {
+          gridData[y][x] = replacementColor;
+          queue.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+        }
+      }
+    }
+
+    // ----------------------------------------------------
+    // 4. 색상 추천 & 팔레트 관리
+    // ----------------------------------------------------
+    const currentColorInput = document.getElementById('currentColor');
+    const paletteGrid = document.getElementById('paletteGrid');
+
+    currentColorInput.addEventListener('input', (e) => {
+      currentColor = e.target.value;
+    });
+
+    function generatePalette(colors) {
+      paletteGrid.innerHTML = '';
+      if (colors.length === 0) return;
+
+      colors.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = color;
+        swatch.addEventListener('click', () => {
+          currentColor = color;
+          currentColorInput.value = color;
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+          swatch.classList.add('selected');
+        });
+        paletteGrid.appendChild(swatch);
+      });
+    }
+
+    // ----------------------------------------------------
+    // 5. 유틸리티 & 다운로드
+    // ----------------------------------------------------
+    const toolButtons = document.querySelectorAll('.tool-btn');
+    toolButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        toolButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTool = btn.dataset.tool;
+      });
+    });
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('');
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'pixel-pattern.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+  </script>
+</body>
+</html>
